@@ -1,17 +1,19 @@
 FROM php:8.2-apache
 
-# Install PDO MySQL extensions
+# Install MySQL drivers
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Ensure Apache rewrite is enabled and only mpm_prefork is active
-RUN a2enmod rewrite \
-    && a2dismod mpm_event mpm_worker || true \
-    && a2enmod mpm_prefork
+# Ensure Apache rewrite is enabled and only prefork MPM is loaded
+RUN a2dismod mpm_event mpm_worker || true \
+    && a2enmod mpm_prefork rewrite
 
-# Copy application files
+# Enable .htaccess support in /var/www/
+RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+
+# Copy source code into the web root
 COPY src/ /var/www/html/
 
-# Set proper ownership and permissions
+# Ensure file permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html
 
