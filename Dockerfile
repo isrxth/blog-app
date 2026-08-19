@@ -1,22 +1,41 @@
-FROM php:8.2-apache
+FROM php:8.2-fpm-alpine
 
-# Install PDO MySQL extensions
-RUN docker-php-ext-install pdo pdo_mysql mysqli
+# Install Nginx and MySQL drivers
+RUN apk add --no-cache nginx \
+    && docker-php-ext-install pdo pdo_mysql mysqli
 
-# Enable mod_rewrite and enforce prefork
-RUN rm -rf /etc/apache2/mods-enabled/mpm* \
-    && ln -s /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/ \
-    && ln -s /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/ \
-    && a2enmod rewrite
+# Configure Nginx
+RUN mkdir -p /run/nginx /var/www/html
+COPY <<EOF /etc/nginx/http.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    root /var/www/html;
+    index index.php index.html;
 
-# Allow .htaccess overrides
-RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
 
-# Copy source
+    location ~ \.php$ {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+}
+EOF
+
+# Copy source files
 COPY src/ /var/www/html/
-RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html
+RUN chown -R www-data:www-data /var/www/html
 
+WORKDIR /var/www/html
 EXPOSE 80
 
-# Source envvars and run apache foreground directly
-CMD ["/bin/bash", "-c", "source /etc/apache2/envvars && exec apache2 -DFOREGROUND"]
+# Start both PHP-FPM and Nginx
+CMD php-fpm -D && nginx -g 'daemon off;'
