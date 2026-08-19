@@ -1,3 +1,17 @@
-<Files .env>
+# Protect hidden files (e.g., .env)
+<Files ".*">
     Require all denied
 </Files>
+
+# Ensure public access to assets
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf)$">
+    Require all granted
+</FilesMatch>
+
+# Standard Routing (bypass rewrite for existing files)
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^ index.php [L,QSA]

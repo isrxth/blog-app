@@ -1,41 +1,25 @@
-FROM php:8.2-fpm-alpine
+FROM php:8.2-apache
 
-# Install Nginx and MySQL drivers
-RUN apk add --no-cache nginx \
-    && docker-php-ext-install pdo pdo_mysql mysqli
+# Install PDO MySQL extensions
+RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Configure Nginx
-RUN mkdir -p /run/nginx /var/www/html
-COPY <<EOF /etc/nginx/http.d/default.conf
-server {
-    listen 80;
-    server_name _;
-    root /var/www/html;
-    index index.php index.html;
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
 
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
+# Explicitly grant access to /var/www/html in Apache config
+RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf \
+    && echo '<Directory /var/www/html/>\n    Options -Indexes +FollowSymLinks\n    AllowOverride All\n    Require all granted\n</Directory>' > /etc/apache2/conf-available/allow-all.conf \
+    && a2enconf allow-all
 
-    location ~ \.php$ {
-        fastcgi_pass 127.0.0.1:9000;
-        fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\. {
-        deny all;
-    }
-}
-EOF
-
-# Copy source files
+# Copy source code
 COPY src/ /var/www/html/
-RUN chown -R www-data:www-data /var/www/html
+
+# Apply proper ownership and execute/read permissions across directories and files
+RUN chown -R www-data:www-data /var/www/html \
+    && find /var/www/html -type d -exec chmod 755 {} + \
+    && find /var/www/html -type f -exec chmod 644 {} +
 
 WORKDIR /var/www/html
-EXPOSE 80
 
-# Start both PHP-FPM and Nginx
-CMD php-fpm -D && nginx -g 'daemon off;'
+EXPOSE 80
+CMD ["apache2-foreground"]
