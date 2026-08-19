@@ -1,24 +1,22 @@
 FROM php:8.2-apache
 
-# Install MySQL extensions
+# Install PDO MySQL extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Completely wipe existing MPM symlinks and force only prefork
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf \
-    && a2enmod mpm_prefork rewrite
+# Enable mod_rewrite and enforce prefork
+RUN rm -rf /etc/apache2/mods-enabled/mpm* \
+    && ln -s /etc/apache2/mods-available/mpm_prefork.load /etc/apache2/mods-enabled/ \
+    && ln -s /etc/apache2/mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/ \
+    && a2enmod rewrite
 
 # Allow .htaccess overrides
 RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
-# Copy application source
+# Copy source
 COPY src/ /var/www/html/
-
-# Set file permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
+RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html
 
 EXPOSE 80
 
-# Explicit entrypoint and foreground command
-ENTRYPOINT ["docker-php-entrypoint"]
-CMD ["apache2-foreground"]
+# Source envvars and run apache foreground directly
+CMD ["/bin/bash", "-c", "source /etc/apache2/envvars && exec apache2 -DFOREGROUND"]
