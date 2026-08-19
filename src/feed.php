@@ -15,7 +15,7 @@ $posts = $stmt->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>THE TRENCHES // GRIDIRON RAW</title>
-    <link rel="stylesheet" href="frontend/style.css">
+    <link rel="stylesheet" href="./frontend/style.css">
 </head>
 <body>
     <!-- Breaking News Ticker -->
